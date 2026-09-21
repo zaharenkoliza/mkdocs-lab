@@ -1,5 +1,6 @@
 site_name: Лабораторная работа
 site_description: Публикация статического сайта с использованием MkDocs и CI/CD
+site_url: https://zaharenkoliza.github.io/mkdocs-lab/
 
 theme:
   name: mkdocs
