@@ -1,0 +1,16 @@
+site_name: Лабораторная работа
+site_description: Публикация статического сайта с использованием MkDocs и CI/CD
+
+theme:
+  name: mkdocs
+  language: ru
+
+nav:
+  - Главная: index.md
+  - О работе: about.md
+  - Инструменты: tools.md
+
+use_directory_urls: true
+
+plugins:
+  - search
