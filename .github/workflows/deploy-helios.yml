@@ -3,7 +3,7 @@ name: Deploy to Helios
 on:
   push:
     branches:
-      - main
+      - "**"
   workflow_dispatch:
 
 jobs:
@@ -23,8 +23,29 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Build site for Helios
-        run: mkdocs build --strict -f mkdocs-helios.yml
+      - name: Prepare deployment variables
+        run: |
+          BRANCH_SLUG=$(echo "${GITHUB_REF_NAME}" \
+            | tr '/_' '--' \
+            | tr -cd '[:alnum:].-')
+
+          echo "BRANCH_SLUG=$BRANCH_SLUG" >> "$GITHUB_ENV"
+
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            echo "DEPLOY_PATH=~/public_html/mkdocs-lab" >> "$GITHUB_ENV"
+            echo "DEPLOY_URL=https://se.ifmo.ru/~s335141/mkdocs-lab/" >> "$GITHUB_ENV"
+          else
+            echo "DEPLOY_PATH=~/public_html/mkdocs-lab-previews/$BRANCH_SLUG" >> "$GITHUB_ENV"
+            echo "DEPLOY_URL=https://se.ifmo.ru/~s335141/mkdocs-lab-previews/$BRANCH_SLUG/" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build site
+        run: |
+          cp mkdocs-helios.yml mkdocs-ci.yml
+
+          sed -i "s|^site_url:.*|site_url: ${DEPLOY_URL}|" mkdocs-ci.yml
+
+          mkdocs build --strict -f mkdocs-ci.yml
 
       - name: Configure SSH
         run: |
@@ -36,32 +57,55 @@ jobs:
 
           ssh-keyscan -H -p 2222 helios.cs.ifmo.ru >> ~/.ssh/known_hosts
 
-      - name: Deploy to Helios
+      - name: Backup current production
+        if: github.ref_name == 'main'
         run: |
           ssh \
             -i ~/.ssh/helios_key \
             -o IdentitiesOnly=yes \
             -p 2222 \
             s335141@helios.cs.ifmo.ru \
-            'mkdir -p ~/public_html/mkdocs-lab'
+            'rm -rf ~/public_html/mkdocs-lab-prev &&
+             if [ -d ~/public_html/mkdocs-lab ]; then
+               cp -a ~/public_html/mkdocs-lab ~/public_html/mkdocs-lab-prev
+             fi'
 
-          scp \
+      - name: Create deployment directory
+        run: |
+          ssh \
             -i ~/.ssh/helios_key \
             -o IdentitiesOnly=yes \
-            -P 2222 \
-            -r site-helios/. \
-            s335141@helios.cs.ifmo.ru:~/public_html/mkdocs-lab/
+            -p 2222 \
+            s335141@helios.cs.ifmo.ru \
+            "mkdir -p ${DEPLOY_PATH}"
 
-      - name: Verify deployment
+      - name: Deploy with rsync
         run: |
-          sleep 2
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/helios_key -o IdentitiesOnly=yes -p 2222" \
+            site-helios/ \
+            "s335141@helios.cs.ifmo.ru:${DEPLOY_PATH}/"
 
-          curl --fail --silent --show-error \
-            https://se.ifmo.ru/~s335141/mkdocs-lab/ \
-            | grep -q "CONTROL_STRING_STATIC_SITE_2026"
+      - name: Healthcheck
+        run: |
+          echo "Checking ${DEPLOY_URL}"
 
-          curl --fail --silent --show-error \
-            https://se.ifmo.ru/~s335141/mkdocs-lab/search/search_index.json \
-            > /dev/null
+          HTTP_CODE=$(curl \
+            --silent \
+            --output /tmp/site.html \
+            --write-out "%{http_code}" \
+            "${DEPLOY_URL}")
 
-          echo "Helios deployment verified successfully"
+          echo "HTTP status: ${HTTP_CODE}"
+
+          if [ "${HTTP_CODE}" != "200" ]; then
+            echo "Expected HTTP 200, got ${HTTP_CODE}"
+            exit 1
+          fi
+
+          if ! grep -q "CONTROL_STRING_STATIC_SITE_2026" /tmp/site.html; then
+            echo "Control string not found"
+            exit 1
+          fi
+
+          echo "Healthcheck successful"
