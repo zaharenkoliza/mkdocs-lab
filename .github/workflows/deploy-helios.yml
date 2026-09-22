@@ -1,0 +1,67 @@
+name: Deploy to Helios
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build site for Helios
+        run: mkdocs build --strict -f mkdocs-helios.yml
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          printf '%s\n' "${{ secrets.HELIOS_SSH_KEY }}" > ~/.ssh/helios_key
+          chmod 600 ~/.ssh/helios_key
+
+          ssh-keyscan -H -p 2222 helios.cs.ifmo.ru >> ~/.ssh/known_hosts
+
+      - name: Deploy to Helios
+        run: |
+          ssh \
+            -i ~/.ssh/helios_key \
+            -o IdentitiesOnly=yes \
+            -p 2222 \
+            s335141@helios.cs.ifmo.ru \
+            'mkdir -p ~/public_html/mkdocs-lab'
+
+          scp \
+            -i ~/.ssh/helios_key \
+            -o IdentitiesOnly=yes \
+            -P 2222 \
+            -r site-helios/. \
+            s335141@helios.cs.ifmo.ru:~/public_html/mkdocs-lab/
+
+      - name: Verify deployment
+        run: |
+          sleep 2
+
+          curl --fail --silent --show-error \
+            https://se.ifmo.ru/~s335141/mkdocs-lab/ \
+            | grep -q "CONTROL_STRING_STATIC_SITE_2026"
+
+          curl --fail --silent --show-error \
+            https://se.ifmo.ru/~s335141/mkdocs-lab/search/search_index.json \
+            > /dev/null
+
+          echo "Helios deployment verified successfully"

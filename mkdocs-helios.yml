@@ -1,0 +1,4 @@
+INHERIT: mkdocs.yml
+
+site_url: https://se.ifmo.ru/~s335141/mkdocs-lab/
+site_dir: site-helios
