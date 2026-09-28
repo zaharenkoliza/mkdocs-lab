@@ -208,7 +208,7 @@ actions/deploy-pages
 В настройках репозитория был выбран источник публикации:
 
 ```text
-Settings → Pages → Build and deployment → Source → GitHub Actions
+Settings > Pages > Build and deployment > Source > GitHub Actions
 ```
 
 После успешного выполнения workflow сайт стал доступен по адресу:
@@ -398,12 +398,12 @@ LICENSE-CONTENT.md
 
 Гипотеза: в настройках репозитория Pages ещё не переключён на источник GitHub Actions, деплой пытается писать в окружение, которого нет.
 
-Проверка: `Settings → Pages` в веб-интерфейсе GitHub, поле `Source` стояло на значении, отличном от `GitHub Actions`.
+Проверка: `Settings > Pages` в веб-интерфейсе GitHub, поле `Source` стояло на значении, отличном от `GitHub Actions`.
 
 Решение:
 
 ```text
-Settings → Pages → Build and deployment → Source → GitHub Actions
+Settings > Pages > Build and deployment > Source > GitHub Actions
 ```
 
 После переключения повторный запуск workflow прошёл без ошибок.
