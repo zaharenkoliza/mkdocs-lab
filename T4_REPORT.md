@@ -383,7 +383,14 @@ document.addEventListener("DOMContentLoaded", function () {
 Нет / слабо:
 
 - pin action по SHA;
-- явный `permissions:` у Helios-workflow;
+- явный `permissions:` у Helios-workflow: без блока действуют `permissions` уровня репозитория, обычно это `read/write` на все ресурсы токена. В `deploy-helios.yml` job вообще не читает `GITHUB_TOKEN` и не пишет в репозиторий, поэтому нужный минимум такой:
+
+```yaml
+permissions:
+  contents: read
+```
+
+Этого достаточно для `actions/checkout`, остальное (rsync на Helios) идёт по SSH-ключу, а не по `GITHUB_TOKEN`;
 - зафиксированный `known_hosts` в репозитории, сейчас каждый раз `ssh-keyscan`;
 - локальная копия highlight.js;
 - ограничение SSH-ключа (`restrict`, `command=`, отдельный пользователь только с правом на `public_html`).
